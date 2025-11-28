@@ -51,6 +51,8 @@ export default function YogaCanvas() {
 
     // React State for UI updates (Sidebar)
     const [uiEnergies, setUiEnergies] = useState<number[]>([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+    const [sessionTime, setSessionTime] = useState("0.0 min");
+    const [mood, setMood] = useState("Relaxed");
 
     const addLog = (msg: string) => setLogs(prev => [...prev.slice(-4), msg]);
 
@@ -347,6 +349,21 @@ export default function YogaCanvas() {
         // Sync UI occasionally (every 10 frames)
         if (Math.floor(t * 30) % 10 === 0) {
             setUiEnergies([...energies]);
+
+            // Update Session Time
+            const elapsedMin = (Date.now() - startTimeRef.current) / 60000;
+            setSessionTime(`${elapsedMin.toFixed(1)} min`);
+
+            // Update Mood
+            if (isMeditationRef.current) {
+                setMood("Peaceful");
+            } else if (gestureRef.current) {
+                setMood("Focused");
+            } else if (eyesClosedTimeRef.current > 0) {
+                setMood("Calm");
+            } else {
+                setMood("Relaxed");
+            }
         }
 
         // 4. Draw Visuals
@@ -411,7 +428,7 @@ export default function YogaCanvas() {
                 </div>
             )}
 
-            <TopBar />
+            <TopBar sessionTime={sessionTime} mood={mood} />
 
             <div className="relative flex-1 w-full h-full overflow-hidden">
                 <video
