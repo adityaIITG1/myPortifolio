@@ -362,8 +362,8 @@ export default function YogaCanvas() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let faceResults = lastFaceResultsRef.current || { faceLandmarks: [] };
 
-            // Throttle detection to every 33ms (approx 30fps checks, but interleaved)
-            if (now - lastDetectionTimeRef.current > 33) {
+            // Throttle detection to every 66ms (approx 15fps checks, interleaved)
+            if (now - lastDetectionTimeRef.current > 66) {
                 lastDetectionTimeRef.current = now;
 
                 // Create/Update Offscreen Canvas for AI (360p)
