@@ -81,15 +81,15 @@ export default function BioAnalyticsPanel({
                 style: 'line' | 'bars' | 'fill' | 'beam'
             ) => {
                 // Background
-                ctx.fillStyle = 'rgba(0, 20, 10, 0.6)';
+                ctx.fillStyle = 'rgba(0, 10, 5, 0.85)'; // Darker background
                 ctx.fillRect(x, y, width, height);
-                ctx.strokeStyle = 'rgba(0, 255, 100, 0.2)';
+                ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'; // Brighter border
                 ctx.strokeRect(x, y, width, height);
 
                 // Label
-                ctx.fillStyle = 'rgba(200, 255, 200, 0.8)';
-                ctx.font = '10px monospace';
-                ctx.fillText(label, x + 5, y + 12);
+                ctx.fillStyle = 'rgba(220, 255, 220, 0.9)'; // Brighter text
+                ctx.font = 'bold 10px monospace';
+                ctx.fillText(label, x + 8, y + 14);
 
                 if (style === 'bars') {
                     const barW = width / data.length;
@@ -125,7 +125,7 @@ export default function BioAnalyticsPanel({
                     if (style === 'fill') {
                         ctx.lineTo(x + width, y + height);
                         ctx.lineTo(x, y + height);
-                        ctx.fillStyle = color.replace('1)', '0.2)'); // Transparent fill
+                        ctx.fillStyle = color.replace('1)', '0.3)'); // Brighter fill
                         ctx.fill();
                     }
                 }
@@ -148,21 +148,23 @@ export default function BioAnalyticsPanel({
     }, [beatDetected, energyLevel, stressLevel, focusScore]);
 
     return (
-        <div className="w-80 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl p-4 flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                <h3 className="text-green-400 font-mono tracking-widest text-sm">BIO-ANALYTICS</h3>
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+        <div className="w-80 bg-black/90 backdrop-blur-xl border border-white/20 rounded-xl p-5 flex flex-col gap-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)]">
+            <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                <h3 className="text-green-400 font-mono tracking-widest text-sm font-bold">BIO-ANALYTICS</h3>
+                <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_10px_currentColor] ${isConnected ? 'bg-green-500 text-green-500 animate-pulse' : 'bg-red-500 text-red-500'}`}></div>
             </div>
 
             {/* Numeric Stats */}
-            <div className="grid grid-cols-2 gap-2">
-                <div className="bg-black/30 p-2 rounded border border-white/5">
-                    <div className="text-[10px] text-gray-400">HEART RATE</div>
-                    <div className="text-2xl font-bold text-white font-mono">{heartRate} <span className="text-sm text-gray-500">BPM</span></div>
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-900/80 p-3 rounded-lg border border-white/10 shadow-inner">
+                    <div className="text-[10px] text-gray-400 font-bold tracking-wider mb-1">HEART RATE</div>
+                    <div className="text-3xl font-bold text-white font-mono flex items-baseline gap-1">
+                        {heartRate} <span className="text-xs text-gray-500 font-normal">BPM</span>
+                    </div>
                 </div>
-                <div className="bg-black/30 p-2 rounded border border-white/5">
-                    <div className="text-[10px] text-gray-400">SpO2</div>
-                    <div className="text-2xl font-bold text-blue-400 font-mono">{spo2}%</div>
+                <div className="bg-gray-900/80 p-3 rounded-lg border border-white/10 shadow-inner">
+                    <div className="text-[10px] text-gray-400 font-bold tracking-wider mb-1">SpO2</div>
+                    <div className="text-3xl font-bold text-blue-400 font-mono">{spo2}%</div>
                 </div>
             </div>
 
@@ -171,7 +173,7 @@ export default function BioAnalyticsPanel({
                 ref={canvasRef}
                 width={280}
                 height={300}
-                className="w-full h-auto rounded bg-black/20"
+                className="w-full h-auto rounded-lg bg-black/40 border border-white/5"
             />
         </div>
     );
