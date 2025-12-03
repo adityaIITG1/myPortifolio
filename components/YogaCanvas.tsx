@@ -15,6 +15,7 @@ import {
     drawSmartTracking,
 } from "@/utils/drawing";
 import { generateSmartCoachMessage } from "@/utils/smart-coach";
+import html2canvas from "html2canvas";
 
 import TopBar from "./TopBar";
 import RightSidebar from "./RightSidebar";
@@ -45,14 +46,31 @@ export default function YogaCanvas() {
     const requestRef = useRef<number>(0);
     const startTimeRef = useRef<number>(0);
 
-    // Refs for Animation Loop State (Fixes Stale Closure)
+    // Refs for Animation Loop State
     const energiesRef = useRef<number[]>([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     const activeIndexRef = useRef(0);
     const gestureRef = useRef<string | null>(null);
-    const auraIntensityRef = useRef(0.0); // 0.0 to 1.0
+    const auraIntensityRef = useRef(0.0);
     const eyesClosedTimeRef = useRef(0);
-    const eyesOpenTimeRef = useRef(0); // Track how long eyes have been open/lost
+    const eyesOpenTimeRef = useRef(0);
     const isMeditationRef = useRef(false);
+
+    // XP & Level State
+    const xpRef = useRef(0.0);
+    const levelRef = useRef(3);
+    const warningMsgRef = useRef<string | null>(null);
+    const pranaRef = useRef(0); // Kumbhaka
+    const namasteHoldTimeRef = useRef(0); // Screenshot Trigger
+    const lastScreenshotTimeRef = useRef(0);
+
+    // UI State for Level & Stats
+    const [xp, setXp] = useState(0);
+    const [level, setLevel] = useState(3);
+    const [levelProgress, setLevelProgress] = useState(0);
+    const [warningMsg, setWarningMsg] = useState<string | null>(null);
+    const [mood, setMood] = useState("Relaxed");
+    const [posture, setPosture] = useState("Good");
+    const [alignmentMode, setAlignmentMode] = useState("Standard");
 
     // Debounce Refs
     const pendingGestureRef = useRef<string | null>(null);
@@ -63,19 +81,7 @@ export default function YogaCanvas() {
     // React State for UI updates (Sidebar)
     const [uiEnergies, setUiEnergies] = useState<number[]>([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     const [sessionTime, setSessionTime] = useState("0.0 min");
-    const [mood, setMood] = useState("Relaxed");
-    const [posture, setPosture] = useState("Good");
-    const [alignmentMode, setAlignmentMode] = useState("Standard");
-
-    // XP & Level State (Refs for Loop, State for UI)
-    const xpRef = useRef(0.0);
-    const levelRef = useRef(3); // Start at Level 3
-    const warningMsgRef = useRef<string | null>(null);
-
-    const [xp, setXp] = useState(0);
-    const [level, setLevel] = useState(3);
-    const [levelProgress, setLevelProgress] = useState(0);
-    const [warningMsg, setWarningMsg] = useState<string | null>(null);
+    const [screenshotFlash, setScreenshotFlash] = useState(false);
 
     const addLog = (msg: string) => setLogs(prev => [...prev.slice(-4), msg]);
 
@@ -187,6 +193,70 @@ export default function YogaCanvas() {
         }
     };
 
+    const takeScreenshot = async () => {
+        const now = Date.now();
+        if (now - lastScreenshotTimeRef.current < 2000) return; // Debounce 2s
+        lastScreenshotTimeRef.current = now;
+
+        // Visual Flash
+        setScreenshotFlash(true);
+        setTimeout(() => setScreenshotFlash(false), 300);
+
+        speak("Screenshot captured.");
+        addLog("📸 Screenshot Saved!");
+
+        if (document.body) {
+            try {
+                const canvas = await html2canvas(document.body, {
+                    useCORS: true,
+                    ignoreElements: (element) => element.tagName === 'VIDEO', // Avoid video taint issues if any
+                    backgroundColor: '#000000',
+                });
+
+                // Manually draw the video frame onto the canvas since html2canvas might miss it
+                if (videoRef.current && canvasRef.current) {
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        // Draw video frame (mirrored)
+                        ctx.save();
+                        ctx.scale(-1, 1);
+                        ctx.translate(-canvas.width, 0);
+                        // We need to draw the video at the bottom layer, but html2canvas already drew the UI.
+                        // Ideally we'd draw video first, but html2canvas captures the DOM.
+                        // A simple workaround for this "parity" task: Just capture the UI or accept the video might be black if tainted.
+                        // Better approach: Draw the current video frame from our canvasRef (which has the video drawn on it!)
+                        // Our canvasRef has the video drawn on it in the animate loop!
+                        // Wait, canvasRef ONLY has the overlays (lines), video is a separate <video> tag.
+                        // But we draw the video onto canvasRef in step 1 of animate loop!
+                        // "ctx.drawImage(video, 0, 0, width, height);"
+                        // So canvasRef actually HAS the video frame!
+                        // So we just need to make sure html2canvas captures canvasRef correctly.
+                    }
+                }
+
+                const link = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15);
+                link.download = `yoga_session_${timestamp}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            } catch (err) {
+                console.error("Screenshot failed:", err);
+                addLog("Screenshot Failed");
+            }
+        }
+    };
+
+    // 'S' Key Listener
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key.toLowerCase() === 's') {
+                takeScreenshot();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     useEffect(() => {
         if (
             !handLandmarker ||
@@ -196,6 +266,12 @@ export default function YogaCanvas() {
         ) return;
 
         startTimeRef.current = Date.now();
+
+        // Load Mudra Images
+        const brainImg = new Image();
+        brainImg.src = "/brain_glow.png";
+        const sunImg = new Image();
+        sunImg.src = "/sun_glow.png";
 
         const animate = () => {
             if (
@@ -234,6 +310,7 @@ export default function YogaCanvas() {
             const handResults = handLandmarker.detectForVideo(video, now);
             const faceResults = faceLandmarker.detectForVideo(video, now);
 
+
             let currentGesture = null;
             let isEyesClosed = false;
 
@@ -241,13 +318,55 @@ export default function YogaCanvas() {
             if (handResults.landmarks) {
                 for (const landmarks of handResults.landmarks) {
                     drawSmartTracking(ctx, landmarks, width, height);
+
                     const g = classifyGesture(landmarks);
-                    if (g) currentGesture = g;
+                    if (g) {
+                        currentGesture = g;
+
+                        // [NEW] Draw Mudra Visuals (Brain/Sun)
+                        // Calculate Palm Center (Approx between Wrist 0 and Middle MCP 9)
+                        const wrist = landmarks[0];
+                        const middleMcp = landmarks[9];
+
+                        const cx = (wrist.x + middleMcp.x) / 2 * width;
+                        const cy = (wrist.y + middleMcp.y) / 2 * height;
+                        const size = 100; // Size of the icon
+
+                        if (g === "Gyan Mudra" && brainImg.complete) {
+                            ctx.save();
+                            ctx.globalAlpha = 0.9;
+                            ctx.drawImage(brainImg, cx - size / 2, cy - size / 2, size, size);
+                            // Glow
+                            ctx.shadowColor = "cyan";
+                            ctx.shadowBlur = 20;
+                            ctx.restore();
+                        } else if (g === "Surya Mudra" && sunImg.complete) {
+                            ctx.save();
+                            ctx.globalAlpha = 0.9;
+                            ctx.drawImage(sunImg, cx - size / 2, cy - size / 2, size, size);
+                            // Glow
+                            ctx.shadowColor = "orange";
+                            ctx.shadowBlur = 20;
+                            ctx.restore();
+                        }
+                    }
                 }
+
                 if (handResults.landmarks.length >= 2) {
                     if (detectNamaste(handResults.landmarks)) {
                         currentGesture = "Namaste / Anjali Mudra";
+
+                        // Screenshot Logic
+                        namasteHoldTimeRef.current += 16; // ~16ms per frame
+                        if (namasteHoldTimeRef.current > 1000) { // 1 second hold
+                            takeScreenshot();
+                            namasteHoldTimeRef.current = 0; // Reset
+                        }
+                    } else {
+                        namasteHoldTimeRef.current = 0;
                     }
+                } else {
+                    namasteHoldTimeRef.current = 0;
                 }
             }
 
@@ -343,26 +462,27 @@ export default function YogaCanvas() {
             // --- XP & LEVEL LOGIC ---
             let xpGain = 0.0;
             let warning = null;
-
-            // 1. Base XP (Posture/Face Detected)
-            if (faceResults.faceLandmarks.length > 0) {
-                xpGain += 0.1;
-            }
-
-            // 2. Mudra Bonus
-            if (currentGesture) {
-                xpGain += 0.2;
-            }
-
-            // 3. Eyes Closed Bonus
-            if (isMeditationRef.current) {
-                xpGain += 0.3;
-            }
-
-            // 4. Level Gating
             const currentLevel = levelRef.current;
+            const XP_PER_LEVEL = 150;
+            const MAX_LEVEL = 20;
 
-            if (currentLevel >= 3 && currentLevel <= 9) {
+            // Base XP for Posture (Proxy using face detection for now)
+            if (faceResults.faceLandmarks.length > 0) {
+                xpGain += 1.0;
+            }
+
+            // Bonus XP for Mudra
+            if (currentGesture) {
+                xpGain += 1.0;
+            }
+
+            // Bonus XP for Eyes Closed
+            if (isMeditationRef.current) {
+                xpGain += 2.0;
+            }
+
+            // Level Gating Logic
+            if (currentLevel >= 3 && currentLevel < 10) {
                 if (!currentGesture) {
                     xpGain = 0;
                     warning = "MUDRA REQUIRED TO PROGRESS!";
@@ -375,19 +495,21 @@ export default function YogaCanvas() {
             }
 
             // Apply XP
-            xpRef.current += xpGain;
-            warningMsgRef.current = warning;
+            if (currentLevel < MAX_LEVEL) {
+                xpRef.current += xpGain;
 
-            // Check Level Up
-            const XP_PER_LEVEL = 100;
-            const calculatedLevel = Math.floor(xpRef.current / XP_PER_LEVEL) + 1;
+                // Check Level Up
+                const calculatedLevel = Math.floor(xpRef.current / XP_PER_LEVEL) + 1;
+                const cappedLevel = Math.min(MAX_LEVEL, calculatedLevel);
 
-            if (calculatedLevel > levelRef.current) {
-                levelRef.current = calculatedLevel;
-                const msg = `Congratulations! You reached Level ${calculatedLevel}.`;
-                setFeedback(msg);
-                speak(msg);
+                if (cappedLevel > levelRef.current) {
+                    levelRef.current = cappedLevel;
+                    const msg = `Congratulations! You reached Level ${cappedLevel}.`;
+                    setFeedback(msg);
+                    speak(msg);
+                }
             }
+            warningMsgRef.current = warning;
 
             // 3. Logic: Aura & Energy
             const isYogaMode = !!currentGesture || isMeditationRef.current;
@@ -399,38 +521,63 @@ export default function YogaCanvas() {
                 auraIntensityRef.current = Math.max(0.0, auraIntensityRef.current - 0.08); // Faster Fade
             }
 
-            // Energy Dynamics
+            // Energy Dynamics (Strict Caps & Rapid Decay)
             const energies = energiesRef.current;
             let allBalanced = true;
 
-            if (isMeditationRef.current) {
-                // SUPER FAST Rise for ALL chakras (Peaking to 100)
-                for (let i = 0; i < 7; i++) {
-                    energies[i] = Math.min(1.0, energies[i] + 0.02); // ~2% per frame (very fast)
-                    if (energies[i] < 1.0) allBalanced = false;
+            // Determine Max Cap based on State
+            let energyCap = 0.1; // Default: Distracted / No Focus
+            let decayRate = 0.05; // Rapid Decay by default
+
+            // [NEW] Energy Peak & Applause Logic
+            let riseRate = 0.005; // Default slow rise
+
+            if (isMeditationRef.current && gestureRef.current) {
+                // "Deep Meditation" State
+                energyCap = 1.0;
+                riseRate = 0.05; // Extremely fast rise (Peak)
+
+                // Trigger Applause if not already triggered recently
+                if (energiesRef.current[0] > 0.95) {
+                    const now = Date.now();
+                    if (now - lastSpeechTimeRef.current > 15000) { // 15s cooldown
+                        const msg = "Excellent! Deep Meditation Achieved.";
+                        setFeedback(msg);
+                        speak(msg);
+                        lastSpeechTimeRef.current = now;
+                        lastSpeechTextRef.current = msg;
+                    }
                 }
+            } else if (isMeditationRef.current) {
+                energyCap = 1.0; // 100% - Eyes Closed (Meditation)
+                decayRate = 0.0; // No decay, rising
+                riseRate = 0.02; // Fast rise
             } else if (currentGesture) {
-                // If ANY gesture is active, slowly rise ALL energies (so boxes aren't empty)
-                for (let i = 0; i < 7; i++) {
-                    energies[i] = Math.min(1.0, energies[i] + 0.001); // Slow base rise
+                energyCap = 0.6; // 60% - Mudra Active
+                decayRate = 0.01; // Slow decay if fluctuating
+                riseRate = 0.01; // Moderate rise
+            } else if (faceResults.faceLandmarks.length > 0) {
+                energyCap = 0.3; // 30% - Face Detected (Good Posture Proxy)
+                decayRate = 0.02; // Moderate decay
+                riseRate = 0.005; // Slow rise
+            }
+
+            // Apply Energy Logic
+            for (let i = 0; i < 7; i++) {
+                if (energies[i] < energyCap) {
+                    // Specific Chakra Boost for Mudras
+                    let currentRise = riseRate;
+                    if (currentGesture === "Gyan Mudra" && (i === 0 || i === 6)) {
+                        currentRise = 0.01; // Boost Root & Crown
+                    }
+
+                    energies[i] = Math.min(energyCap, energies[i] + currentRise);
+                } else if (energies[i] > energyCap) {
+                    // Decay Logic (Rapid Drop if cap lowered)
+                    energies[i] = Math.max(energyCap, energies[i] - decayRate);
                 }
 
-                if (currentGesture === "Gyan Mudra") {
-                    // Specific Rise (Faster)
-                    energies[0] = Math.min(1.0, energies[0] + 0.005); // Root
-                    energies[6] = Math.min(1.0, energies[6] + 0.005); // Crown
-                }
-                // Add other mudras here if needed
-
-                allBalanced = false;
-            } else if (!isYogaMode) {
-                // FAST DECAY when inactive
-                for (let i = 0; i < 7; i++) {
-                    energies[i] = Math.max(0.0, energies[i] - 0.01); // Fast decay
-                }
-                allBalanced = false;
-            } else {
-                allBalanced = false;
+                if (energies[i] < 0.95) allBalanced = false;
             }
 
             // Check for Full Balance Event
@@ -449,15 +596,22 @@ export default function YogaCanvas() {
                 const elapsedMin = (Date.now() - startTimeRef.current) / 60000;
                 setSessionTime(`${elapsedMin.toFixed(1)} min`);
 
-                // Update Mood
+                // Update Mood & Posture
                 if (isMeditationRef.current) {
                     setMood("Peaceful");
+                    setPosture("Lotus");
                 } else if (gestureRef.current) {
                     setMood("Focused");
+                    setPosture("Asana");
                 } else if (eyesClosedTimeRef.current > 0) {
                     setMood("Calm");
-                } else {
+                    setPosture("Good");
+                } else if (faceResults.faceLandmarks.length > 0) {
                     setMood("Relaxed");
+                    setPosture("Good");
+                } else {
+                    setMood("Distracted");
+                    setPosture("Adjust");
                 }
 
                 // Update Level UI
@@ -502,6 +656,65 @@ export default function YogaCanvas() {
                 breathFactor,
                 t
             );
+
+            // --- KUMBHAKA (Breath Retention) LOGIC ---
+            let isTouchingNose = false;
+            if (faceResults.faceLandmarks.length > 0 && handResults.landmarks.length > 0) {
+                const noseTip = faceResults.faceLandmarks[0][4]; // Nose Tip
+
+                for (const hand of handResults.landmarks) {
+                    const indexTip = hand[8]; // Index Finger Tip
+                    const thumbTip = hand[4]; // Thumb Tip
+
+                    // Check distance to Index or Thumb
+                    const distIndex = Math.hypot(noseTip.x - indexTip.x, noseTip.y - indexTip.y);
+                    const distThumb = Math.hypot(noseTip.x - thumbTip.x, noseTip.y - thumbTip.y);
+
+                    if (distIndex < 0.05 || distThumb < 0.05) { // Threshold
+                        isTouchingNose = true;
+                        break;
+                    }
+                }
+            }
+
+            // Update Prana Value
+            if (isTouchingNose) {
+                pranaRef.current = Math.min(100, pranaRef.current + 0.5);
+            } else {
+                pranaRef.current = Math.max(0, pranaRef.current - 1.0);
+            }
+
+            // Draw Kumbhaka Bar
+            if (pranaRef.current > 0) {
+                const barW = 300;
+                const barH = 20;
+                const barX = canvas.width / 2 - barW / 2;
+                const barY = canvas.height - 150;
+
+                // Label
+                ctx.fillStyle = "rgba(0, 255, 255, 1)";
+                ctx.font = "bold 16px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(isTouchingNose ? "KUMBHAKA ACTIVE: HOLD BREATH" : "PRANA DISSIPATING...", canvas.width / 2, barY - 10);
+
+                // Bar Background
+                ctx.fillStyle = "rgba(0, 50, 50, 0.8)";
+                ctx.fillRect(barX, barY, barW, barH);
+                ctx.strokeStyle = "rgba(0, 255, 255, 0.5)";
+                ctx.strokeRect(barX, barY, barW, barH);
+
+                // Bar Fill
+                ctx.fillStyle = isTouchingNose ? "rgba(0, 255, 255, 1)" : "rgba(0, 150, 150, 0.8)";
+                ctx.fillRect(barX, barY, (pranaRef.current / 100) * barW, barH);
+
+                // Glow
+                if (isTouchingNose) {
+                    ctx.shadowColor = "rgba(0, 255, 255, 0.8)";
+                    ctx.shadowBlur = 15;
+                    ctx.fillRect(barX, barY, (pranaRef.current / 100) * barW, barH);
+                    ctx.shadowBlur = 0;
+                }
+            }
 
             requestRef.current = requestAnimationFrame(animate);
         };
@@ -551,14 +764,31 @@ export default function YogaCanvas() {
             />
 
             {/* Level Progress Bar (Top Right Center) */}
-            <div className="absolute top-24 right-80 w-64 z-20 pointer-events-none flex flex-col items-end">
+            {/* Level Progress Bar (Top Right Center) */}
+            <div className="absolute top-24 right-80 w-80 z-20 pointer-events-none flex flex-col items-end">
                 <div className="flex justify-between items-end mb-1 w-full">
                     <span className="text-yellow-400 font-bold text-3xl tracking-widest drop-shadow-[0_0_10px_rgba(234,179,8,0.8)] animate-pulse">LEVEL {level}</span>
+                    <span className="text-yellow-200/80 font-mono text-sm tracking-widest">{Math.floor(levelProgress)}%</span>
                 </div>
-                <div className="h-6 w-full bg-black/60 border-2 border-yellow-500 rounded-sm overflow-hidden shadow-[0_0_20px_rgba(234,179,8,0.5)] relative">
-                    <div className="h-full bg-gradient-to-r from-yellow-600 via-yellow-400 to-yellow-200" style={{ width: `${levelProgress}%` }}></div>
+                <div className="h-8 w-full bg-black/80 border-2 border-yellow-500 rounded-lg overflow-hidden shadow-[0_0_25px_rgba(234,179,8,0.6)] relative backdrop-blur-sm">
+                    {/* Background Glow */}
+                    <div className="absolute inset-0 bg-yellow-900/20"></div>
+
+                    {/* Progress Fill */}
+                    <div
+                        className="h-full bg-gradient-to-r from-yellow-700 via-yellow-500 to-yellow-200 relative overflow-hidden transition-all duration-300 ease-out"
+                        style={{ width: `${levelProgress}%`, boxShadow: '0 0 20px rgba(234, 179, 8, 0.8)' }}
+                    >
+                        {/* Shine Effect */}
+                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/40 to-transparent opacity-50"></div>
+                        <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_infinite]"></div>
+                    </div>
+
                     {/* Scanline effect */}
-                    <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.3)_50%)] bg-[length:4px_4px] pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.4)_50%)] bg-[length:4px_4px] pointer-events-none opacity-70"></div>
+
+                    {/* Glass Reflection */}
+                    <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
                 </div>
 
                 {/* Mudra Required Warning */}
@@ -567,14 +797,27 @@ export default function YogaCanvas() {
                         {warningMsg}
                     </div>
                 )}
+
+                {/* Level Titles */}
+                {level >= 6 && level <= 10 && (
+                    <div className="mt-2 text-yellow-300 font-bold text-lg tracking-[0.2em] drop-shadow-[0_0_10px_rgba(255,215,0,0.8)] animate-pulse">
+                        YOG GURU
+                    </div>
+                )}
+                {level >= 11 && level <= 15 && (
+                    <div className="mt-2 text-cyan-300 font-bold text-lg tracking-[0.2em] drop-shadow-[0_0_10px_rgba(0,255,255,0.8)] animate-pulse">
+                        TRUE YOGI
+                    </div>
+                )}
+                {level >= 16 && (
+                    <div className="mt-2 text-purple-300 font-bold text-xl tracking-[0.2em] drop-shadow-[0_0_15px_rgba(255,0,255,0.8)] animate-pulse">
+                        MASTER YOGI 🏆
+                    </div>
+                )}
             </div>
 
-            {/* Left Sidebar (Chakra Meters) */}
-            <LeftSidebar energies={uiEnergies} />
-
-            {/* Bio-Analytics Panel (Left Side, Next to Sidebar) */}
             {arduinoData.isConnected && (
-                <div className="absolute top-32 left-32 z-20 animate-slide-in-left">
+                <div className="absolute top-4 left-20 z-20 animate-slide-in-left">
                     <BioAnalyticsPanel
                         heartRate={arduinoData.heartRate}
                         spo2={arduinoData.spo2}
@@ -674,6 +917,30 @@ export default function YogaCanvas() {
             {arduinoError && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-lg shadow-xl z-50 animate-bounce">
                     ⚠️ {arduinoError}
+                </div>
+            )}
+
+            {/* Draw Namaste Progress Bar (Screenshot) */}
+            {namasteHoldTimeRef.current > 100 && (
+                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-50">
+                    <div className="text-white font-bold text-xs tracking-widest animate-pulse">HOLD FOR SCREENSHOT...</div>
+                    <div className="w-48 h-2 bg-black/50 rounded-full overflow-hidden border border-white/20">
+                        <div
+                            className="h-full bg-green-500 transition-all duration-75 ease-linear"
+                            style={{ width: `${Math.min(100, (namasteHoldTimeRef.current / 1000) * 100)}%` }}
+                        ></div>
+                    </div>
+                </div>
+            )}
+
+            {/* Screenshot Flash Overlay */}
+            {screenshotFlash && (
+                <div className="absolute inset-0 bg-white z-[100] animate-flash pointer-events-none"></div>
+            )}
+            {screenshotFlash && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-green-400 px-8 py-4 rounded-xl border border-green-500 shadow-2xl z-[101] flex flex-col items-center animate-bounce">
+                    <span className="text-4xl">📸</span>
+                    <span className="text-xl font-bold tracking-widest mt-2">SCREENSHOT SAVED!</span>
                 </div>
             )}
         </div>

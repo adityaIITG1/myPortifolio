@@ -16,13 +16,31 @@ const MUDRAS = [
 
 export default function RightSidebar({ activeGesture }: RightSidebarProps) {
     return (
-        <div className="absolute top-24 bottom-24 right-6 w-[280px] flex flex-col gap-4 z-20 pointer-events-none">
+        <div className="absolute top-4 bottom-4 right-6 w-[280px] flex flex-col gap-3 z-20 pointer-events-none">
 
-            {/* Touch Nose Indicator (New) */}
-            <div className="bg-yellow-500/10 backdrop-blur-md border border-yellow-500/50 rounded-xl p-3 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                <h3 className="text-yellow-400 font-bold text-xs uppercase tracking-widest mb-1">Touch Nose to Enable</h3>
-                <div className="text-[10px] text-yellow-200 font-mono">Breathing Exercise</div>
-                <div className="text-[9px] text-gray-400 mt-1">Touch Heart Sensor</div>
+            {/* Touch Nose Indicator (Premium & Popping) */}
+            <div className="relative group overflow-hidden rounded-xl p-0.5 animate-pulse-slow">
+                {/* Animated Gradient Border */}
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 animate-gradient-x"></div>
+
+                <div className="relative bg-black/90 backdrop-blur-xl rounded-[10px] p-3 flex flex-col items-center text-center gap-1 shadow-[0_0_20px_rgba(234,179,8,0.4)]">
+                    <div className="absolute top-0 right-0 p-1">
+                        <span className="flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                        </span>
+                    </div>
+
+                    <h3 className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-yellow-500 font-black text-xs uppercase tracking-widest drop-shadow-sm">
+                        Touch Nose
+                    </h3>
+                    <div className="text-[10px] text-white font-bold tracking-wide">
+                        To Enable Breathing
+                    </div>
+                    <div className="text-[8px] text-yellow-500/80 font-mono uppercase tracking-wider mt-0.5">
+                        • Activate Sensor •
+                    </div>
+                </div>
             </div>
 
             {/* Header */}

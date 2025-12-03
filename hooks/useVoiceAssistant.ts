@@ -19,14 +19,9 @@ export function useVoiceAssistant() {
         setIsSpeaking(true);
         synthRef.current.cancel(); // Stop any current speech
 
-        const text = "Namaste. Mai Yoga AI hue. Mujhe banaya hai Aditya, Aditi, aur Aryan ne. " +
-            "Mai aapko detailed features batati hu. " +
-            "Features include: Real-time Heart Rate aur SpO2 Sensor Graphs, AI Mudra Detector jo aapke gestures pehchanta hai, " +
-            "Chakra Energy Analysis, aur Smart Posture Correction. " +
-            "Python Deep Learning Libraries jo humne use kiye hain: " +
-            "MediaPipe for vision, TensorFlow aur Keras for deep learning models, " +
-            "OpenCV for image processing, aur NumPy for analytics. " +
-            "Enjoy your Yoga session!";
+        const text = "Namaste. Mai Yoga AI hu. Mai aap ki kai tariko se help kar sakti hu. " +
+            "Mere paas Heart Rate Sensor, Yoga Detector Sensor, Mudra AI, Energy Box, aur kai advanced technologies hain. " +
+            "Please use me to check your Yoga. Bye Bye!";
 
         const utterance = new SpeechSynthesisUtterance(text);
 

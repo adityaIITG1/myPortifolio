@@ -190,10 +190,10 @@ export default function BioAnalyticsPanel({
                 }
             };
 
-            const graphH = 55;
-            const gap = 10;
-            const startY = 145;
-            const panelW = 350; // Fixed width logic from python
+            const graphH = 48; // Compacted height
+            const gap = 8; // Compacted gap
+            const startY = 130; // Moved up
+            const panelW = 420; // Increased width
             const graphW = panelW - 40;
             const graphX = 20;
 
@@ -220,7 +220,7 @@ export default function BioAnalyticsPanel({
                 ctx.fillStyle = color;
                 ctx.fillText(label, x, y);
                 const barH = 15;
-                const barW = 60;
+                const barW = 80; // Wider bars
                 const bx = x;
                 const by = y + 5;
 
@@ -232,9 +232,10 @@ export default function BioAnalyticsPanel({
                 });
             };
 
+            // Spread out tiny graphs
             drawTinyBar("Vata", vataHistoryRef.current, graphX, tgY + 20, 'rgb(255, 200, 100)');
-            drawTinyBar("Pitta", pittaHistoryRef.current, graphX + 80, tgY + 20, 'rgb(255, 0, 0)');
-            drawTinyBar("Kapha", kaphaHistoryRef.current, graphX + 160, tgY + 20, 'rgb(0, 255, 0)');
+            drawTinyBar("Pitta", pittaHistoryRef.current, graphX + 120, tgY + 20, 'rgb(255, 0, 0)');
+            drawTinyBar("Kapha", kaphaHistoryRef.current, graphX + 240, tgY + 20, 'rgb(0, 255, 0)');
 
             ctx.fillStyle = 'rgba(200, 255, 255, 1)';
             ctx.fillText(finding, graphX, tgY + 55);
@@ -278,7 +279,7 @@ export default function BioAnalyticsPanel({
 
             // --- DATA ANALYSIS BOT ---
             const botY = coherenceY + radius + 30;
-            const botX = 50 + 20; // panel_x + 50 relative to canvas 0
+            const botX = 70; // Fixed left position
 
             // Update Bot State
             const t = Date.now() / 1000;
@@ -354,7 +355,7 @@ export default function BioAnalyticsPanel({
     }, [beatDetected, energyLevel, stressLevel, focusScore, hrvIndex, doshas, insightText, finding]);
 
     return (
-        <div className="relative w-[350px] h-[720px] bg-[#05080f] border-2 border-[#00d7ff] rounded-lg overflow-hidden shadow-[0_0_30px_rgba(0,215,255,0.3)]">
+        <div className="relative w-[420px] h-[680px] bg-[#05080f] border-2 border-[#00d7ff] rounded-lg overflow-hidden shadow-[0_0_30px_rgba(0,215,255,0.3)]">
             {/* Header */}
             <div className="absolute top-5 left-0 w-full text-center">
                 <h3 className="text-[#00ffff] font-sans text-sm font-bold tracking-widest">BIO-ANALYTICS ENGINE</h3>
@@ -378,8 +379,8 @@ export default function BioAnalyticsPanel({
             {/* Canvas Layer */}
             <canvas
                 ref={canvasRef}
-                width={350}
-                height={720}
+                width={420}
+                height={680}
                 className="absolute top-0 left-0 w-full h-full pointer-events-none"
             />
 
