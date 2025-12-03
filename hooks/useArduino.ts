@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export interface ArduinoData {
     heartRate: number;
@@ -20,14 +20,29 @@ export function useArduino() {
     const readerRef = useRef<ReadableStreamDefaultReader<string> | null>(null);
     const isReadingRef = useRef(false);
     const lastBeatTimeRef = useRef<number>(0);
+    const lastDataTimeRef = useRef<number>(0);
+
+    // Data Timeout & Reset Logic
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (data.isConnected && Date.now() - lastDataTimeRef.current > 3000) {
+                // No data for 3 seconds, reset
+                setData(prev => {
+                    if (prev.heartRate === 0 && prev.spo2 === 0) return prev; // Already reset
+                    return { ...prev, heartRate: 0, spo2: 0, beatDetected: false };
+                });
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [data.isConnected]);
 
     const parseLine = useCallback((line: string) => {
         // Expected format: "BPM:75,SpO2:98" or similar
         if (!line) return;
 
         const parts = line.split(',');
-        let newHr = 0;
-        let newSpo2 = 0;
+        let newHr: number | null = null;
+        let newSpo2: number | null = null;
         let beat = false;
 
         parts.forEach(part => {
@@ -45,8 +60,12 @@ export function useArduino() {
             }
         });
 
-        if (newHr > 0 || newSpo2 > 0) {
-            if (newHr > 0) {
+        // Update if we got valid keys
+        if (newHr !== null || newSpo2 !== null) {
+            lastDataTimeRef.current = Date.now();
+
+            // Beat simulation if not explicit
+            if (newHr !== null && newHr > 0) {
                 const now = Date.now();
                 const beatInterval = 60000 / newHr;
                 if (now - lastBeatTimeRef.current > beatInterval) {
@@ -57,8 +76,8 @@ export function useArduino() {
 
             setData(prev => ({
                 ...prev,
-                heartRate: newHr || prev.heartRate,
-                spo2: newSpo2 || prev.spo2,
+                heartRate: newHr !== null ? newHr : prev.heartRate,
+                spo2: newSpo2 !== null ? newSpo2 : prev.spo2,
                 beatDetected: beat
             }));
 
@@ -135,7 +154,7 @@ export function useArduino() {
             setError(err instanceof Error ? err.message : String(err));
             setData(prev => ({ ...prev, isConnected: false }));
         }
-    }, [readLoop]); // Removed readLoop from dependency array to avoid circular dependency, relying on closure
+    }, [readLoop]);
 
     return {
         arduinoData: data,
